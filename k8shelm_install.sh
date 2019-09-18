@@ -22,27 +22,35 @@ fi
     sleep 5s
     clear
     ##Prompt for FOSSA server hostname
-    read -ep "Enter the hostname for the FOSSA server " fossa_hostname
+    read -ep "Enter the hostname for the FOSSA server: " fossa_hostname
 
     ##Prompt for Minio hostname
-    read -ep "Enter the hostname for the Minio server " minio_hostname
+    read -ep "Enter the hostname for the Minio server: " minio_hostname
 
 
     ##Prompt for path and file names for FOSSA key
-    read -ep "Enter directory path for FOSSA Certificate Files (Example: /xxx/yyy/certs) " fossa_file_dir
+    read -ep "Enter directory path for FOSSA Certificate Files (Example: /xxx/yyy/certs): " fossa_file_dir
     #capture key file name
-    read -ep "Enter the file name of your FOSSA key file " fossa_key
+    read -ep "Enter the file name of your FOSSA key file: " fossa_key
     #capture certificate file name
-    read -ep "Enter the file name of your FOSSA certificate file " fossa_cert
+    read -ep "Enter the file name of your FOSSA certificate file: " fossa_cert
 
 
     ##Prompt for path and file names for Minio key
-    read -ep "Enter directory path for Minio Certificate Files (Example: /xxx/yyy/certs) " minio_file_dir
+    read -ep "Enter directory path for Minio Certificate Files (Example: /xxx/yyy/certs): " minio_file_dir
     #capture key file name
-    read -ep "Enter the file name of your Minio key file " minio_key
+    read -ep "Enter the file name of your Minio key file: " minio_key
     #capture certificate file name
-    read -ep "Enter the file name of your Minio certificate file " minio_cert
+    read -ep "Enter the file name of your Minio certificate file: " minio_cert
 
+    #capture the image tag
+    read -ep "Enter the image tag to be used for this deployment: " -i "release" image_tag
+
+    #capture the secret(used to secure db transactions)
+    read -ep "Enter the 64 bit secret which is used to secure db transactions: " -i "60f7e466f818f42ceacb927d7f057c285e5ca1032b8ef5b2f49ca9715859f5af" secret_key
+
+    #capture the from email address for support requests
+    read -ep "Enter the from email address for support requests: " -i "support@fossa.io" from_email
 
     #Check for EC2
     #Set Environment Variables
@@ -63,7 +71,9 @@ fi
         ;;
     esac
     #Update packages
-    echo "Initiating OS Package Updates"
+    echo "################################"
+    echo "Initiating OS Package Updates. #"
+    echo "################################"
     if [ "$OS_CHECK" = "aptgetpm" ]; then
         #Install Docker
         sudo apt-get -qq -y install docker.io  &>> ~/fossa_install.log
@@ -87,29 +97,41 @@ fi
     #    wget -c https://raw.githubusercontent.com/joey-fossa/fossa-install/master/setup_centos.sh -O /opt/fossa/setup.sh
     #    sudo chmod +x /opt/fossa/setup.sh
     fi
-    echo "Finished OS Package Updates"
+    echo "##############################"
+    echo "Finished OS Package Updates. #"
+    echo "##############################"
     ################################################################################################
     ################################################################################################
     # Get the Docker gpg key
     sleep 5s
     clear
-    echo "Install GPG Keys"
-    echo "Get Docker GPG key"
+    echo "#####################"
+    echo "Install GPG Keys.   #"
+    echo "#####################"
+    echo "#####################"
+    echo "Get Docker GPG key. #"
+    echo "#####################"
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add - &>> ~/fossa_install.log
     #Add the Docker repository:
     sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" &>> ~/fossa_install.log
     #Get the Kubernetes gpg key
-    echo "Get Kubernetes GPG key"
+    echo "#########################"
+    echo "Get Kubernetes GPG key. #"
+    echo "#########################"
     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -  &>> ~/fossa_install.log
     # Add the Kubernetes repository:
     cat << EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
 deb https://apt.kubernetes.io/ kubernetes-xenial main
 EOF
     #Update packages
-    echo "Apt-Get Update"
+    echo "##################"
+    echo "Apt-Get Update.  #"
+    echo "##################"
     sudo apt-get -qq update &>> ~/fossa_install.log
     #Install Docker, kubelet, kubeadm and kubectl
-    echo "Install docker-ce, kubelet, kubeadm, kubectl"
+    echo "################################################"
+    echo "Install docker-ce, kubelet, kubeadm, kubectl.  #"
+    echo "################################################"
     sudo apt-get install -qq -y docker-ce=18.06.1~ce~3-0~ubuntu kubelet=1.13.5-00 kubeadm=1.13.5-00 kubectl=1.13.5-00 &>> ~/fossa_install.log
     #Hold them at the current version:
     sudo apt-mark -qq hold docker-ce kubelet kubeadm kubectl &>> ~/fossa_install.log
@@ -120,9 +142,13 @@ EOF
     #Initialize the cluster (run only on the master)
     sleep 5s
     clear
-    echo "Initializing Kubernetes"
+    echo "##########################"
+    echo "Initializing Kubernetes. #"
+    echo "##########################"
     sudo kubeadm init --pod-network-cidr=10.244.0.0/16  &>> ~/fossa_install.log
-    echo "Kubernetes Initialization Complete"
+    echo "######################################"
+    echo "Kubernetes Initialization Complete.  #"
+    echo "######################################"
     #set up local kubeconfig:
     mkdir -p $HOME/.kube  &>> ~/fossa_install.log
     sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config  &>> ~/fossa_install.log
@@ -130,7 +156,9 @@ EOF
     #Apply Flannel CNI network overlay:
     kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml &>> ~/fossa_install.log
     #Verify the kubernetes node:
-    echo "Check Kubernetes Node Status"
+    echo "###############################"
+    echo "Check Kubernetes Node Status. #"
+    echo "###############################"
     kubectl get nodes  &>> ~/fossa_install.log
     #Remove tain from the master node
     kubectl taint nodes --all node-role.kubernetes.io/master-  &>> ~/fossa_install.log
@@ -140,7 +168,9 @@ EOF
 ###################################################################################################
 sleep 5s
 clear
-echo "Deploying FOSSA"
+echo "##################"
+echo "Deploying FOSSA. #"
+echo "##################"
 cd /opt/  &>> ~/fossa_install.log
 #Clone Github repo for Fossa
 git clone https://github.com/chiphwang/fossa_helm.git  &>> ~/fossa_install.log
@@ -156,35 +186,46 @@ cd /opt/fossa_helm/ &>> ~/fossa_install.log
 cp $fossa_file_dir/$fossa_key /opt/fossa_helm/fossa/certs/fossa.key  &>> ~/fossa_install.log
 if [ $? -ne 0 ]
 then
-  echo "Unable to copy FOSSA key file. Halting"
+  echo "##########################################"
+  echo "Unable to copy FOSSA key file. Halting.  #"
+  echo "##########################################"
   exit 1
 fi
 
 cp $fossa_file_dir/$fossa_cert /opt/fossa_helm/fossa/certs/fossa.pem  &>> ~/fossa_install.log
 if [ $? -ne 0 ]
 then
-  echo "Unable to copy FOSSA certificate file. Halting"
+  echo "#################################################"
+  echo "Unable to copy FOSSA certificate file. Halting. #"
+  echo "#################################################"
   exit 1
 fi
-echo "Finished copying FOSSA TLS files"
+echo "####################################"
+echo "Finished copying FOSSA TLS files.  #"
+echo "####################################"
 
 
 cp $minio_file_dir/$minio_key /opt/fossa_helm/fossa/certs/minio.key  &>> ~/fossa_install.log
 if [ $? -ne 0 ]
 then
-  echo "Unable to copy Minio key file. Halting"
+  echo "#########################################"
+  echo "Unable to copy Minio key file. Halting. #"
+  echo "#########################################"
   exit 1
 fi
 cp $minio_file_dir/$minio_cert /opt/fossa_helm/fossa/certs/minio.pem  &>> ~/fossa_install.log
 if [ $? -ne 0 ]
 then
-  echo "Unable to copy Minio certificate file. Halting"
+  echo "#################################################"
+  echo "Unable to copy Minio certificate file. Halting. #"
+  echo "#################################################"
+
   exit 1
 fi
 
-echo "Finished copying Minio TLS files"
-
-
+echo "##################################"
+echo "Finished copying Minio TLS files #"
+echo "##################################"
 ##############################################################################
 kubectl create secret docker-registry quay.io --docker-server=quay.io --docker-username=fossa+se --docker-password=WF5GM4KAVLBE1VS1O4Z6V4BRG5K25P94ZY09ANW5S6A08X3OXRDZHSI3CA4YD1WO --docker-email=xxx@yyy.com --dry-run -o yaml > quay_secret.yaml
 kubectl -n fossa create -f quay_secret.yaml 
@@ -197,7 +238,9 @@ kubectl create  -n fossa configmap ca-pemstore --from-file=/opt/fossa_helm/fossa
 ##############################################################################
 sleep 5s
 clear
-echo "Installing Helm"
+echo "#############################"
+echo "Installing Helm             #"
+echo "#############################"
 # install helm
 curl -LO https://git.io/get_helm.sh &>> ~/fossa_install.log
 chmod 700 get_helm.sh &>> ~/fossa_install.log
@@ -217,9 +260,20 @@ helm init --service-account tiller &>> ~/fossa_install.log
 # move to working directory
 cd /opt/fossa_helm &>> ~/fossa_install.log
 
+###############################################################################################
+# Section to update values.yaml file prior to running the helm install
+###############################################################################################
+sudo sed -i -e 's/hostip: null/hostip: '$PRIMARY_IP'/g' /opt/fossa_helm/fossa/values.yaml 2> ~/fossa_install.log
+sudo sed -i -e 's/fossahostname: null/fossahostname: '$fossa_hostname'/g' /opt/fossa_helm/fossa/values.yaml 2> ~/fossa_install.log
+sudo sed -i -e 's/miniohostname: null/miniohostname: '$minio_hostname'/g' /opt/fossa_helm/fossa/values.yaml 2> ~/fossa_install.log
+sudo sed -i -e 's/tag: release/tag: '$image_tag'/g' /opt/fossa_helm/fossa/values.yaml 2> ~/fossa_install.log
+sudo sed -i -e 's/secret: 60f7e466f818f42ceacb927d7f057c285e5ca1032b8ef5b2f49ca9715859f5af/secret: '$secret_key'/g' /opt/fossa_helm/fossa/values.yaml 2> ~/fossa_install.log
+sudo sed -i -e 's/from: support@fossa.io/from: '$from_email'/g' /opt/fossa_helm/fossa/values.yaml 2> ~/fossa_install.log
+###############################################################################################
 sleep 60s
 clear
-/usr/local/bin/helm install --name fossa ./fossa --set fossahostname=$fossa_hostname,hostip=$PRIMARY_IP,miniohostname=$minio_hostname --namespace fossa
+#/usr/local/bin/helm install --name fossa ./fossa --set fossahostname=$fossa_hostname,hostip=$PRIMARY_IP,miniohostname=$minio_hostname --namespace fossa
+/usr/local/bin/helm install --name fossa ./fossa --namespace fossa
 ################################################################################################
 #Add while checks for status of pods
 sleep 10s
@@ -228,7 +282,7 @@ clear
 set -f -- $(kubectl -n fossa get pod | grep database)
 while [ "$3" != "Running" ]
 do
-    echo 'Waiting for Database'
+    echo 'Waiting for Database to be Ready'
     sleep 10s
     set -f -- $(kubectl -n fossa get pod | grep database)
 done
@@ -248,7 +302,7 @@ echo "Migration Complete"
 set -f -- $(kubectl -n fossa get pod | grep minio-0)
 while [ "$3" != "Running" ]
 do
-    echo 'Waiting for Minio'
+    echo 'Waiting for Minio to be Ready'
     sleep 10s
     set -f -- $(kubectl -n fossa get pod | grep minio-0)
 done
@@ -258,7 +312,7 @@ echo "Minio Ready"
 set -f -- $(kubectl -n fossa get pod | grep fossa-core)
 while [ "$3" != "Running" ]
 do
-    echo 'Waiting for FOSSA Core'
+    echo 'Waiting for FOSSA Core to be Ready'
     sleep 10s
     set -f -- $(kubectl -n fossa get pod | grep fossa-core)
 done
@@ -276,4 +330,3 @@ echo '# Manually create a bucket in Minio named fossa.net'
 echo '# Minio Access Key: minio'
 echo '# Minio Secret Key: minio123'
 echo '################################################################################################'
-################################################################################################  
